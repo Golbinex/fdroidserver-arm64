@@ -45,6 +45,10 @@ deb ${debian_mirror} bookworm-updates main
 EOF
 echo "deb ${debian_mirror} bookworm-backports main" > /etc/apt/sources.list.d/backports.list
 
+apt-get install binfmt-support qemu-user-static
+update-binfmts --display
+dpkg --add-architecture amd64
+
 apt-get update || apt-get update
 
 # purge things that might come from the base box, but we don't want
@@ -105,10 +109,10 @@ apt-get update || apt-get update
 
 packages="
  apksigner
- default-jdk-headless
- default-jre-headless
+ default-jdk-headless:amd64
+ default-jre-headless:amd64
  curl
- dexdump
+ dexdump:amd64
  fdroidserver
  git-svn
  gnupg

@@ -24,7 +24,7 @@ parser.add_option('-v', '--verbose', action="count", dest='verbosity', default=1
 parser.add_option('-q', action='store_const', const=0, dest='verbosity')
 parser.add_option("-c", "--clean", action="store_true", default=False,
                   help="Build from scratch, rather than attempting to update the existing server")
-parser.add_option('--skip-box-verification', action="store_true", default=False,
+parser.add_option('--skip-box-verification', action="store_true", default=True,
                   help="""Skip verifying the downloaded base box.""")
 parser.add_option('--skip-cache-update', action="store_true", default=False,
                   help="""Skip downloading and checking cache."""
@@ -47,8 +47,8 @@ logging.basicConfig(format=logformat, level=loglevel)
 
 tail = None
 
-BASEBOX_DEFAULT = 'debian/bookworm64'
-BASEBOX_VERSION_DEFAULT = "12.20240905.1"
+BASEBOX_DEFAULT = 'golbinex/debian12-arm64'
+BASEBOX_VERSION_DEFAULT = "0.0.1"
 BASEBOX_CHECKSUMS = {
     "12.20240905.1": {
         "libvirt": {
@@ -240,18 +240,6 @@ def main():
         logging.info('skipping cache update and verification...')
     else:
         update_cache(config['cachedir'])
-
-    # use VirtualBox software virtualization if hardware is not available,
-    # like if this is being run in kvm or some other VM platform, like
-    # http://jenkins.debian.net, the values are 'on' or 'off'
-    if config.get('hwvirtex') != 'off' and os.path.exists('/proc/cpuinfo'):
-        with open('/proc/cpuinfo') as f:
-            contents = f.read()
-        if 'vmx' in contents or 'svm' in contents:
-            logging.debug('found \'vmx\' or \'svm\' in /proc/cpuinfo -> hwvirtex = \'on\'')
-        else:
-            logging.error('hwvirtex = \'on\' and no \'vmx\' or \'svm\' found in /proc/cpuinfo!')
-            sys.exit(1)
 
     serverdir = os.path.join(os.getcwd(), 'buildserver')
     logfilename = os.path.join(serverdir, 'up.log')
