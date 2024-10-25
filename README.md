@@ -29,10 +29,25 @@ _fdroidserver_ even though it no longer contains any proper server component.
 
 ## Installing
 
-There are many ways to install _fdroidserver_, including using a range of
-package managers.  All of the options are documented on the website:
+Follow installation instructions on:
+
 https://f-droid.org/docs/Installing_the_Server_and_Repo_Tools
 
+https://f-droid.org/docs/Build_Server_Setup/
+
+
+**libvirt.loader** variable in **buildserver/Vagrantfile** and **fdroiddata/builder/Vagrantfile** is set to path specific for NixOS. This needs to be modified on other distributions.
+
+Vagrantfile generated in **fdroiddata/builder/** must be modified to include these lines:
+    
+    libvirt.cpu_mode = "host-passthrough"
+    libvirt.features = ["apic"]
+    libvirt.input :type => "mouse", :bus => "usb"
+    libvirt.input :type => "keyboard", :bus => "usb"
+    libvirt.usb_controller :model => "qemu-xhci"
+    libvirt.machine_type = "virt"
+    libvirt.loader = "/run/libvirt/nix-ovmf/AAVMF_CODE.fd" # MODIFY THIS IF NOT USED ON NIXOS
+    
 
 ## Releases
 
