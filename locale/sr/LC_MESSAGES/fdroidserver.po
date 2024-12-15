@@ -8,16 +8,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: fdroidserver 2.1b0\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/fdroid/fdroidserver/issues\n"
-"POT-Creation-Date: 2024-09-10 10:50+0200\n"
-"PO-Revision-Date: 2024-09-10 09:27+0000\n"
-"Last-Translator: Hans-Christoph Steiner <hans@guardianproject.info>\n"
+"POT-Creation-Date: 2024-12-11 14:37+0100\n"
+"PO-Revision-Date: 2024-11-29 10:00+0000\n"
+"Last-Translator: Reno Tx <renotx@users.noreply.hosted.weblate.org>\n"
 "Language-Team: Serbian <https://hosted.weblate.org/projects/f-droid/fdroidserver/sr/>\n"
 "Language: sr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"X-Generator: Weblate 5.8-dev\n"
+"X-Generator: Weblate 5.9-dev\n"
 
 #: ../fdroidserver/nightly.py
 msgid ""
@@ -204,6 +204,10 @@ msgid "'{value}' is not a valid {field}, should be {pattern}"
 msgstr "'{value}' није важећи {field}, треба да буде {pattern}"
 
 #: ../fdroidserver/checkupdates.py
+msgid "--merge-request only runs on a single appid!"
+msgstr "--merge-request се извршава само на једној апликацији!"
+
+#: ../fdroidserver/checkupdates.py
 #, python-brace-format
 msgid "...checkupdate failed for {appid} : {error}"
 msgstr "...провера ажурирања није успела за {appid} : {error}"
@@ -330,6 +334,14 @@ msgstr "Архивирање {apkfilename} са неважећим потпис�
 msgid "AutoUpdateMode with UpdateCheckMode: HTTP must have a pattern."
 msgstr "AutoUpdateMode са UpdateCheckMode: HTTP мора имати образац."
 
+#: ../fdroidserver/install.py
+msgid "Automatic no to all prompts."
+msgstr "Аутоматски одговори \"не\" на све упите."
+
+#: ../fdroidserver/install.py
+msgid "Automatic yes to all prompts."
+msgstr "Аутоматски одговори \"да\" на све упите."
+
 #: ../fdroidserver/index.py
 #, python-brace-format
 msgid "Bad entry type \"{mirrortype}\" in mirrors config: {mirror}"
@@ -423,6 +435,10 @@ msgstr "Провера архивирања за {appid} - апк-и:{integer}, 
 msgid "Clean update - don't uses caches, reprocess all APKs"
 msgstr "Чисто ажурирање – не користите кешеве, поново обрађујте све АПК-ове"
 
+#: ../fdroidserver/common.py
+msgid "Color the log output"
+msgstr "Бојење излазних логова"
+
 #: ../fdroidserver/import_subcommand.py
 msgid "Comma separated list of categories."
 msgstr "Запета раздвојена листа категорија."
@@ -435,6 +451,10 @@ msgstr "Наредба „%s” није препозната.\n"
 #: ../fdroidserver/checkupdates.py
 msgid "Commit changes"
 msgstr "Потврди измене"
+
+#: ../fdroidserver/checkupdates.py
+msgid "Commit changes, push, then make a merge request"
+msgstr "Уређивање промена, пуш, затим направите захтев за спајање"
 
 #: ../fdroidserver/metadata.py
 #, python-brace-format
@@ -619,6 +639,10 @@ msgstr "Не освежавајте репозиторијум, корисно �
 msgid "Don't use rsync checksums"
 msgstr "Не користите rsync чексуме"
 
+#: ../fdroidserver/install.py
+msgid "Download F-Droid.apk using mirrors that leak less to the network"
+msgstr "Преузмите F-Droid.apk користећи огледала која мање цуре у мрежу"
+
 #: ../fdroidserver/__main__.py
 msgid "Download complete mirrors of small repos"
 msgstr "Преузмите комплетне огледале малих репоа"
@@ -681,12 +705,12 @@ msgstr "ГРЕШКА: неподржан git домаћин \"%s\", закрпе
 #: ../fdroidserver/lint.py
 #, python-brace-format
 msgid "ERROR: {key} in {path} is not \"archive\" or \"repo\"!"
-msgstr ""
+msgstr "ERROR: {key} у {path} није \"archive\" или \"repo\"!"
 
 #: ../fdroidserver/lint.py
 #, python-brace-format
 msgid "ERROR: {key}:{subkey} in {path} is not in allowed keys: {allowed_keys}!"
-msgstr ""
+msgstr "ERROR: {key}:{subkey} у {path} није у дозвољеним кључевима: {allowed_keys}!"
 
 #: ../fdroidserver/__main__.py
 #, python-brace-format
@@ -709,7 +733,7 @@ msgstr "Еколошка променљива {var} из {configname} није �
 
 #: ../fdroidserver/deploy.py
 msgid "Error deploying 'github_releases', {} not present. (You might need to run `fdroid update` first.)"
-msgstr ""
+msgstr "Error deploying 'github_releases', {} није присутан. (Можда треба прво да покренете `fdroid update`.)"
 
 #: ../fdroidserver/import_subcommand.py
 msgid "Error while getting repo address"
@@ -726,6 +750,10 @@ msgstr "Извлачење метаподатака апликације из и
 #: ../fdroidserver/__main__.py
 msgid "Extract signatures from APKs"
 msgstr "Извуците потписе из АПК-ова"
+
+#: ../fdroidserver/install.py
+msgid "F-Droid.apk could not be downloaded from any known source!"
+msgstr "F-Droid.apk није могао да се преузме са било ког познатог извора!"
 
 #: ../fdroidserver/update.py
 #, python-brace-format
@@ -1185,6 +1213,10 @@ msgstr "Нема пронађеног Android SDK!"
 msgid "No attached devices found"
 msgstr "Није пронађен ниједан прикључени уређај"
 
+#: ../fdroidserver/install.py
+msgid "No devices found for `adb install`! Please plug one in."
+msgstr "Нема пронађених уређаја за `adb install`! Молимо вас, уметните један."
+
 #: ../fdroidserver/index.py
 msgid "No fingerprint in URL."
 msgstr "Нема отиска прста у УРЛ-у."
@@ -1299,16 +1331,16 @@ msgid "Offline machine, skipping git mirror generation until `fdroid deploy`"
 msgstr "Оффлайн машина, прескочено генерисање git огледала до `fdroid deploy`"
 
 #: ../fdroidserver/deploy.py
-msgid "One of the 'github_releases' config items is missing the 'projectUrl' value. skipping ..."
-msgstr ""
+msgid "One of the 'github_releases' config items is missing the 'packageNames' value. skipping ..."
+msgstr "Једна од 'github_releases' конфигурационих ставки нема 'packageNames' вредност. прескакање ..."
 
 #: ../fdroidserver/deploy.py
-msgid "One of the 'github_releases' config items is missing the 'packageNames' value. skipping ..."
-msgstr ""
+msgid "One of the 'github_releases' config items is missing the 'projectUrl' value. skipping ..."
+msgstr "Једна од 'github_releases' конфигурационих ставки недостаје 'projectUrl' вредност. прескакање ..."
 
 #: ../fdroidserver/deploy.py
 msgid "One of the 'github_releases' config items is missing the 'token' value. skipping ..."
-msgstr ""
+msgstr "Једна од 'github_releases' конфигурационих ставки нема 'token' вредност. прескакање ..."
 
 #: ../fdroidserver/update.py
 #, python-brace-format
@@ -1387,6 +1419,11 @@ msgstr "Путања до хранионице за кључ потписива�
 #: ../fdroidserver/nightly.py
 msgid "Print the secret variable to the terminal for easy copy/paste"
 msgstr "Штампај тајну променљиву на терминал за лако копирање/налепљивање"
+
+#: ../fdroidserver/install.py
+#, python-brace-format
+msgid "Privacy mode was enabled based on your locale ({country_code})."
+msgstr "Режим приватности је омогућен на основу ваше локације ({country_code})."
 
 #: ../fdroidserver/scanner.py
 #, python-format
@@ -1474,6 +1511,10 @@ msgstr "Читање {apkfilename} из кеша→"
 msgid "Refresh and cache scanner rules and signatures from the network"
 msgstr "Освежите и кеширајте правила и потписе скенера са мреже"
 
+#: ../fdroidserver/verify.py
+msgid "Remove source tarball and any APKs if successfully verified."
+msgstr ""
+
 #: ../fdroidserver/common.py
 msgid "Removing specified files"
 msgstr "Уклањање наведених датотека"
@@ -1508,6 +1549,11 @@ msgstr "Промени величину свих икона које прела�
 msgid "Restrict output to warnings and errors"
 msgstr "Ограничите излаз на упозорења и грешке"
 
+#: ../fdroidserver/net.py
+#, python-format
+msgid "Retrying failed download: %s"
+msgstr "Поновно покушавање неуспелог преузимања: %s"
+
 #: ../fdroidserver/__main__.py
 msgid "Rewrite all the metadata files"
 msgstr "Преупишите све метаподатке"
@@ -1524,7 +1570,7 @@ msgstr "Покрени на git репозиторијуму који има н�
 #: ../fdroidserver/nightly.py
 #, python-brace-format
 msgid "Run over {cibase} to find -debug.apk. and skip repo_basedir {repo_basedir}"
-msgstr ""
+msgstr "Покрените преко {cibase} да пронађете -debug.apk. и прескочите repo_basedir {repo_basedir}"
 
 #: ../fdroidserver/lint.py
 msgid "Run rewritemeta to fix formatting"
@@ -1573,6 +1619,10 @@ msgid_plural "Scanner found {} problems"
 msgstr[0] "Скенирање је пронашло {} проблем"
 msgstr[1] "Скенирање је пронашло {} проблема"
 msgstr[2] "Скенирање је пронашло {} проблема"
+
+#: ../fdroidserver/scanner.py
+msgid "Scanning APK for extra signing blocks."
+msgstr "Сkeniranje АПК-а за додатне блокове потписивања."
 
 #: ../fdroidserver/scanner.py
 msgid "Scanning APK with dexdump for known non-free classes."
@@ -1766,9 +1816,8 @@ msgid "To use awsbucket, awssecretkey and awsaccesskeyid must also be set in con
 msgstr "Да бисте користили awsbucket, awssecretkey и awsaccesskeyid морају бити подешени у config.yml!"
 
 #: ../fdroidserver/deploy.py
-#, fuzzy
 msgid "To use rclone, rclone_config and awsbucket must be set in config.yml!"
-msgstr "Да бисте користили awsbucket, awssecretkey и awsaccesskeyid морају бити подешени у config.yml!"
+msgstr "Да бисте користили rclone, rclone_config и awsbucket морају бити подешени у config.yml!"
 
 #: ../fdroidserver/lint.py
 msgid "URL must start with https:// or http://"
@@ -1968,9 +2017,9 @@ msgid "Using \"{path}\" for configuring s3cmd."
 msgstr "Користим \"{path}\" за конфигурисање s3cmd."
 
 #: ../fdroidserver/deploy.py
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Using \"{path}\" for syncing with remote storage."
-msgstr "Користим \"{path}\" за конфигурисање s3cmd."
+msgstr "Користим \"{path}\" за синхронизацију са удаљеним складиштем."
 
 #: ../fdroidserver/common.py
 msgid "Using APK Signature v2"
@@ -2004,9 +2053,9 @@ msgid "Using existing keystore \"{path}\""
 msgstr "Користим постојећи keystore \"{path}\""
 
 #: ../fdroidserver/deploy.py
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Using rclone to sync with: {url}"
-msgstr "Користим s3cmd за синхронизацију са: {url}"
+msgstr "Користим rclone за синхронизацију са: {url}"
 
 #: ../fdroidserver/deploy.py
 #, python-brace-format
@@ -2029,6 +2078,11 @@ msgstr "Верификуј интегритет преузетих пакета"
 msgid "Verifying index signature:"
 msgstr "Верификација потписа индекса:"
 
+#: ../fdroidserver/install.py
+#, python-brace-format
+msgid "Verifying package {path} with apksigner."
+msgstr "Провера пакета {path} са apksigner."
+
 #: ../fdroidserver/deploy.py
 #, python-brace-format
 msgid "VirusTotal API key cannot upload files larger than 32MB, use {url} to upload {path}."
@@ -2037,6 +2091,10 @@ msgstr "VirusTotal API кључ не може отпремити датотек�
 #: ../fdroidserver/__main__.py
 msgid "Warn about possible metadata errors"
 msgstr "Упозорење о могућим грешкама у метаподацима"
+
+#: ../fdroidserver/scanner.py
+msgid "WebAssembly binary file"
+msgstr "ВебАсембли бинарни фајл"
 
 #: ../fdroidserver/update.py
 msgid "When configured for signed indexes, create only unsigned indexes at this stage"
@@ -2050,6 +2108,14 @@ msgstr "Када се врши провера целог репозиториј�
 msgid "When signing or verifying fails, exit with an error code."
 msgstr "Када потписивање или верификација не успеју, излазите са кодом грешке."
 
+#: ../fdroidserver/install.py
+msgid "Would you like to download and install F-Droid.apk via adb? (YES/no)"
+msgstr "Да ли желите да преузмете и инсталирате F-Droid.apk преко adb? (ДА/не)"
+
+#: ../fdroidserver/install.py
+msgid "Would you like to download the app(s) from f-droid.org? (YES/no)"
+msgstr "Да ли желите да преузмете апликацију(е) са f-droid.org? (ДА/не)"
+
 #: ../fdroidserver/init.py
 msgid "X.509 'Distinguished Name' used when generating keys"
 msgstr "X.509 'Distinguished Name' коришћен приликом генерисања кључева"
@@ -2061,6 +2127,11 @@ msgstr "Можеш користити ANDROID_HOME да подесиш пута�
 #: ../fdroidserver/scanner.py
 msgid "ZIP file archive"
 msgstr "ZIP архивска датотека"
+
+#: ../fdroidserver/install.py
+#, python-brace-format
+msgid "adb reports {serial} is \"{status}\"!"
+msgstr "adb пријављује {serial} је \"{status}\"!"
 
 #: ../fdroidserver/nightly.py
 #, python-brace-format
@@ -2229,7 +2300,7 @@ msgstr "бришем: repo/{apkfilename}"
 
 #: ../fdroidserver/scanner.py
 msgid "dependency file without lock"
-msgstr ""
+msgstr "фајл зависности без закључавања"
 
 #: ../fdroidserver/common.py
 #, python-brace-format
@@ -2560,9 +2631,9 @@ msgid "s3cmd sync indexes {path} to {url} and delete"
 msgstr "s3cmd синхронизује индексе {path} са {url} и брише"
 
 #: ../fdroidserver/deploy.py
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "s3cmd syncs indexes from {path} to {url} and deletes removed"
-msgstr "s3cmd синхронизује индексе {path} са {url} и брише"
+msgstr "s3cmd синхронизује индексе из {path} у {url} и брише уклоњене"
 
 #: ../fdroidserver/scanner.py
 #, python-brace-format
@@ -2628,6 +2699,10 @@ msgstr "достављени референтни бинарни фајл има
 msgid "the following arguments are required: %s"
 msgstr "следећи аргументи су обавезни: %s"
 
+#: ../fdroidserver/install.py
+msgid "true"
+msgstr "истина"
+
 #: /usr/lib/python3.5/argparse.py /usr/lib/python3.6/argparse.py
 #: /usr/lib/python3.7/argparse.py /usr/lib/python3.9/argparse.py
 #: /usr/lib/python3.11/argparse.py
@@ -2668,6 +2743,10 @@ msgstr "користећи Apache libcloud за синхронизацију с�
 #: ../fdroidserver/deploy.py
 msgid "virustotal.com is rate limiting, waiting to retry..."
 msgstr "virustotal.com ограничава брзину, чекање на поновни покушај..."
+
+#: ../fdroidserver/install.py
+msgid "yes"
+msgstr "да"
 
 #: ../fdroidserver/publish.py
 #, python-brace-format
@@ -2782,6 +2861,11 @@ msgstr "{path} има лош потпис датотеке \"{pattern}\", мог
 #, python-brace-format
 msgid "{path} has been flagged by virustotal {count} times:"
 msgstr "{path} је означен од стране virustotal {count} пута:"
+
+#: ../fdroidserver/install.py
+#, python-brace-format
+msgid "{path} has the wrong fingerprint ({fingerprint})!"
+msgstr "{path} има погрешан отисак прста ({fingerprint})!"
 
 #: ../fdroidserver/common.py
 #, python-brace-format

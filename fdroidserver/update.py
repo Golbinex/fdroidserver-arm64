@@ -362,7 +362,7 @@ def get_cache():
             if not isinstance(v['antiFeatures'], dict):
                 v['antiFeatures'] = {k: {} for k in sorted(v['antiFeatures'])}
         if 'added' in v:
-            v['added'] = datetime.fromtimestamp(v['added'])
+            v['added'] = datetime.fromtimestamp(v['added'], tz=timezone.utc)
 
     return apkcache
 
@@ -690,7 +690,7 @@ def scan_repo_for_ipas(apkcache, repodir, knownapks):
             apkcache[ipa_name] = ipa
             cachechanged = True
 
-        added = knownapks.recordapk(ipa_name, ipa['packageName'])
+        added = knownapks.recordapk(ipa_name)
         if added:
             ipa['added'] = added
 
@@ -803,7 +803,7 @@ def _strip_and_copy_image(in_file, outpath):
     Potential source of Python code to strip JPEGs without dependencies:
     http://www.fetidcascade.com/public/minimal_exif_writer.py
     """
-    logging.debug('copying ' + in_file + ' ' + outpath)
+    logging.debug('copying %s %s', in_file, outpath)
 
     if not os.path.exists(in_file):
         if os.path.islink(in_file):
@@ -1549,8 +1549,9 @@ def scan_repo_files(apkcache, repodir, knownapks, use_date_from_file=False):
             default_date_param = None
 
         # Record in knownapks, getting the added date at the same time..
-        added = knownapks.recordapk(repo_file['apkName'], repo_file['packageName'],
-                                    default_date=default_date_param)
+        added = knownapks.recordapk(
+            repo_file['apkName'], default_date=default_date_param
+        )
         if added:
             repo_file['added'] = added
 
@@ -2001,13 +2002,12 @@ def process_apk(apkcache, apkfilename, repodir, knownapks, use_date_from_apk=Fal
         fill_missing_icon_densities(empty_densities, iconfilename, apk, repodir)
 
         if use_date_from_apk:
-            default_date_param = datetime.fromtimestamp(os.stat(apkfile).st_mtime)
+            default_date_param = datetime.fromtimestamp(os.stat(apkfile).st_mtime, tz=timezone.utc)
         else:
             default_date_param = None
 
         # Record in known apks, getting the added date at the same time..
-        added = knownapks.recordapk(apk['apkName'], apk['packageName'],
-                                    default_date=default_date_param)
+        added = knownapks.recordapk(apk['apkName'], default_date=default_date_param)
         if added:
             apk['added'] = added
 
@@ -2276,15 +2276,9 @@ def archive_old_apks(apps, apks, archapks, repodir, archivedir, defaultkeepversi
         return sorted_list
 
     for appid, app in apps.items():
-
-        if app.get('ArchivePolicy') is not None:
-            keepversions = app['ArchivePolicy']
-        else:
-            keepversions = defaultkeepversions
-            if app.get('VercodeOperation'):
-                keepversions *= len(app['VercodeOperation'])
-            if common.metadata_find_developer_signing_files(appid, app['CurrentVersionCode']):
-                keepversions *= 2
+        keepversions = common.calculate_archive_policy(app, defaultkeepversions)
+        if common.metadata_find_developer_signing_files(appid, app['CurrentVersionCode']):
+            keepversions *= 2
 
         logging.debug(_("Checking archiving for {appid} - apks:{integer}, keepversions:{keep}, archapks:{arch}")
                       .format(appid=appid, integer=len(apks), keep=keepversions, arch=len(archapks)))
@@ -2420,12 +2414,12 @@ def create_metadata_from_template(apk):
 def read_added_date_from_all_apks(apps, apks):
     """No summary.
 
-    Added dates come from the stats/known_apks.txt file but are
+    Added dates come from the repo/index-v2.json file but are
     read when scanning apks and thus need to be applied form apk
     level to app level for _all_ apps and not only from non-archived
     ones
 
-    TODO: read the added dates directly from known_apks.txt instead of
+    TODO: read the added dates directly from index-v2.json instead of
           going through apks that way it also works for for repos that
           don't keep an archive of apks.
     """
@@ -2771,10 +2765,6 @@ def main():
     if git_remote or os.path.isdir(os.path.join('binary_transparency', '.git')):
         from . import btlog
         btlog.make_binary_transparency_log(repodirs)
-
-    if config['update_stats']:
-        # Update known apks info...
-        knownapks.writeifchanged()
 
     status_update_json(apps, apks + archapks)
 

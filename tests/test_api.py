@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 
-import inspect
 import os
-import sys
+import shutil
 import unittest
+from pathlib import Path
 from unittest import mock
 
-localmodule = os.path.realpath(
-    os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), '..')
-)
-print('localmodule: ' + localmodule)
-if localmodule not in sys.path:
-    sys.path.insert(0, localmodule)
-
 import fdroidserver
+from fdroidserver import common, signindex
+from .testcommon import GP_FINGERPRINT, mkdtemp
+
+
+basedir = Path(__file__).parent
 
 
 class ApiTest(unittest.TestCase):
@@ -26,8 +24,19 @@ class ApiTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.basedir = os.path.join(localmodule, 'tests')
-        os.chdir(self.basedir)
+        os.chdir(basedir)
+
+        self._td = mkdtemp()
+        self.testdir = self._td.name
+
+        common.config = None
+        config = common.read_config()
+        config['jarsigner'] = common.find_sdk_tools_cmd('jarsigner')
+        common.config = config
+        signindex.config = config
+
+    def tearDown(self):
+        self._td.cleanup()
 
     def test_download_repo_index_no_fingerprint(self):
         with self.assertRaises(fdroidserver.VerificationException):
@@ -67,26 +76,28 @@ class ApiTest(unittest.TestCase):
             )
             self.assertEqual(index_url, etag_set_to_url)
 
-    @mock.patch('fdroidserver.net.http_get')
-    def test_download_repo_index_v2_url_parsing(self, mock_http_get):
-        """Test whether it is trying to download the right file
-
-        This passes the URL back via the etag return value just as a
-        hack to check which URL was actually attempted.
-
-        """
-        mock_http_get.side_effect = lambda url, etag, timeout: (None, url)
-        repo_url = 'https://example.org/fdroid/repo'
-        entry_url = 'https://example.org/fdroid/repo/entry.jar'
-        index_url = 'https://example.org/fdroid/repo/index-v2.json'
-        for url in (repo_url, entry_url, index_url):
-            _ignored, etag_set_to_url = fdroidserver.download_repo_index_v2(
+    @mock.patch('fdroidserver.net.download_using_mirrors')
+    def test_download_repo_index_v2(self, mock_download_using_mirrors):
+        """Basically a copy of IndexTest.test_download_repo_index_v2"""
+        mock_download_using_mirrors.side_effect = lambda mirrors: os.path.join(
+            self.testdir, 'repo', os.path.basename(mirrors[0]['url'])
+        )
+        os.chdir(self.testdir)
+        signindex.config['keystore'] = os.path.join(basedir, 'keystore.jks')
+        os.mkdir('repo')
+        shutil.copy(basedir / 'repo' / 'entry.json', 'repo')
+        shutil.copy(basedir / 'repo' / 'index-v2.json', 'repo')
+        signindex.sign_index('repo', 'entry.json')
+        repo_url = 'https://fake.url/fdroid/repo'
+        entry_url = 'https://fake.url/fdroid/repo/entry.jar'
+        index_url = 'https://fake.url/fdroid/repo/index-v2.json'
+        fingerprint_url = 'https://fake.url/fdroid/repo?fingerprint=' + GP_FINGERPRINT
+        slash_url = 'https://fake.url/fdroid/repo//?fingerprint=' + GP_FINGERPRINT
+        for url in (repo_url, entry_url, index_url, fingerprint_url, slash_url):
+            data, _ignored = fdroidserver.download_repo_index_v2(
                 url, verify_fingerprint=False
             )
-            self.assertEqual(entry_url, etag_set_to_url)
-
-
-if __name__ == "__main__":
-    newSuite = unittest.TestSuite()
-    newSuite.addTest(unittest.makeSuite(ApiTest))
-    unittest.main(failfast=False)
+            self.assertEqual(['repo', 'packages'], list(data))
+            self.assertEqual(
+                'My First F-Droid Repo Demo', data['repo']['name']['en-US']
+            )

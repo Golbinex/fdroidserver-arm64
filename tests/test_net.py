@@ -1,36 +1,34 @@
 #!/usr/bin/env python3
 
-import inspect
-import logging
 import os
 import random
 import requests
 import socket
-import sys
 import tempfile
 import threading
 import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-localmodule = os.path.realpath(
-    os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), '..')
-)
-print('localmodule: ' + localmodule)
-if localmodule not in sys.path:
-    sys.path.insert(0, localmodule)
-
-from fdroidserver import common, net
+from fdroidserver import net
 from pathlib import Path
 
 
 class RetryServer:
-    """A stupid simple HTTP server that can fail to connect"""
+    """A stupid simple HTTP server that can fail to connect.
+
+    Proxy settings via environment variables can interfere with this
+    test. The requests library will automatically pick up proxy
+    settings from environment variables. Proxy settings can force the
+    local connection over the proxy, which might not support that,
+    then this fails with an error like 405 or others.
+
+    """
 
     def __init__(self, port=None, failures=3):
         self.port = port
         if self.port is None:
-            self.port = random.randint(1024, 65535)
+            self.port = random.randint(1024, 65535)  # nosec B311
         self.failures = failures
         self.stop_event = threading.Event()
         threading.Thread(target=self.run_fake_server).start()
@@ -39,9 +37,13 @@ class RetryServer:
         self.stop_event.set()
 
     def run_fake_server(self):
-        server_sock = socket.socket()
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_sock.bind(('127.0.0.1', self.port))
+        addr = ('localhost', self.port)
+        if socket.has_dualstack_ipv6():
+            server_sock = socket.create_server(
+                addr, family=socket.AF_INET6, dualstack_ipv6=True
+            )
+        else:
+            server_sock = socket.create_server(addr)
         server_sock.listen(5)
         server_sock.settimeout(5)
         time.sleep(0.001)  # wait for it to start
@@ -76,10 +78,7 @@ class RetryServer:
 
 
 class NetTest(unittest.TestCase):
-    basedir = Path(__file__).resolve().parent
-
     def setUp(self):
-        logging.basicConfig(level=logging.DEBUG)
         self.tempdir = tempfile.TemporaryDirectory()
         os.chdir(self.tempdir.name)
         Path('tmp').mkdir()
@@ -107,6 +106,7 @@ class NetTest(unittest.TestCase):
         self.assertTrue(os.path.exists(f))
         self.assertEqual('tmp/com.downloader.aegis-3175421.apk', f)
 
+    @patch.dict(os.environ, clear=True)
     def test_download_file_retries(self):
         server = RetryServer()
         f = net.download_file('http://localhost:%d/f.txt' % server.port)
@@ -114,6 +114,7 @@ class NetTest(unittest.TestCase):
         self.assertEqual(server.reply.split(b'\n\n')[1], Path(f).read_bytes())
         server.stop()
 
+    @patch.dict(os.environ, clear=True)
     def test_download_file_retries_not_forever(self):
         """The retry logic should eventually exit with an error."""
         server = RetryServer(failures=5)
@@ -121,22 +122,27 @@ class NetTest(unittest.TestCase):
             net.download_file('http://localhost:%d/f.txt' % server.port)
         server.stop()
 
+    @unittest.skipIf(os.getenv('CI'), 'FIXME this fails mysteriously only in GitLab CI')
+    @patch.dict(os.environ, clear=True)
+    def test_download_using_mirrors_retries(self):
+        server = RetryServer()
+        f = net.download_using_mirrors(
+            [
+                'https://fake.com/f.txt',  # 404 or 301 Redirect
+                'https://httpbin.org/status/403',
+                'https://httpbin.org/status/500',
+                'http://localhost:1/f.txt',  # ConnectionError
+                'http://localhost:%d/should-succeed' % server.port,
+            ],
+        )
+        # strip the HTTP headers and compare the reply
+        self.assertEqual(server.reply.split(b'\n\n')[1], Path(f).read_bytes())
+        server.stop()
 
-if __name__ == "__main__":
-    os.chdir(os.path.dirname(__file__))
-
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Spew out even more information than normal",
-    )
-    common.options = common.parse_args(parser)
-
-    newSuite = unittest.TestSuite()
-    newSuite.addTest(unittest.makeSuite(NetTest))
-    unittest.main(failfast=False)
+    @patch.dict(os.environ, clear=True)
+    def test_download_using_mirrors_retries_not_forever(self):
+        """The retry logic should eventually exit with an error."""
+        server = RetryServer(failures=5)
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            net.download_using_mirrors(['http://localhost:%d/' % server.port])
+        server.stop()

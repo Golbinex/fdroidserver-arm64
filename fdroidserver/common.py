@@ -28,6 +28,7 @@
 # common.py is imported by all modules, so do not import third-party
 # libraries here as they will become a requirement for all commands.
 
+import copy
 import difflib
 from typing import List
 import git
@@ -55,11 +56,13 @@ from pathlib import Path
 
 import defusedxml.ElementTree as XMLElementTree
 
+from argparse import BooleanOptionalAction
 from asn1crypto import cms
 from base64 import urlsafe_b64encode
 from binascii import hexlify
 from datetime import datetime, timedelta, timezone
 from queue import Queue
+from urllib.parse import urlparse, urlsplit, urlunparse
 from zipfile import ZipFile
 
 import fdroidserver.metadata
@@ -162,7 +165,6 @@ default_config = {
     'make_current_version_link': False,
     'current_version_name_source': 'Name',
     'deploy_process_logs': False,
-    'update_stats': False,
     'repo_maxage': 0,
     'build_server_always': False,
     'keystore': 'keystore.p12',
@@ -220,18 +222,60 @@ def parse_args(parser):
 def setup_global_opts(parser):
     try:  # the buildserver VM might not have PIL installed
         from PIL import PngImagePlugin
+
         logger = logging.getLogger(PngImagePlugin.__name__)
         logger.setLevel(logging.INFO)  # tame the "STREAM" debug messages
     except ImportError:
         pass
 
-    parser.add_argument("-v", "--verbose", action="store_true", default=False,
-                        help=_("Spew out even more information than normal"))
-    parser.add_argument("-q", "--quiet", action="store_true", default=False,
-                        help=_("Restrict output to warnings and errors"))
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help=_("Spew out even more information than normal"),
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help=_("Restrict output to warnings and errors"),
+    )
+    parser.add_argument(
+        "--color",
+        action=BooleanOptionalAction,
+        default=None,
+        help=_("Color the log output"),
+    )
 
 
-def set_console_logging(verbose=False):
+class ColorFormatter(logging.Formatter):
+
+    def __init__(self, msg):
+        logging.Formatter.__init__(self, msg)
+
+        bright_black = "\x1b[90;20m"
+        yellow = "\x1b[33;20m"
+        red = "\x1b[31;20m"
+        bold_red = "\x1b[31;1m"
+        reset = "\x1b[0m"
+
+        self.FORMATS = {
+            logging.DEBUG: bright_black + msg + reset,
+            logging.INFO: reset + msg + reset,  # use default color
+            logging.WARNING: yellow + msg + reset,
+            logging.ERROR: red + msg + reset,
+            logging.CRITICAL: bold_red + msg + reset
+        }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+def set_console_logging(verbose=False, color=False):
     """Globally set logging to output nicely to the console."""
 
     class _StdOutFilter(logging.Filter):
@@ -243,13 +287,18 @@ def set_console_logging(verbose=False):
     else:
         level = logging.ERROR
 
+    if color or (color is None and sys.stdout.isatty()):
+        formatter = ColorFormatter
+    else:
+        formatter = logging.Formatter
+
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.addFilter(_StdOutFilter())
-    stdout_handler.setFormatter(logging.Formatter('%(message)s'))
+    stdout_handler.setFormatter(formatter('%(message)s'))
 
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setLevel(logging.ERROR)
-    stderr_handler.setFormatter(logging.Formatter(_('ERROR: %(message)s')))
+    stderr_handler.setFormatter(formatter(_('ERROR: %(message)s')))
 
     logging.basicConfig(
         force=True, level=level, handlers=[stdout_handler, stderr_handler]
@@ -436,6 +485,14 @@ def get_config():
     return config
 
 
+def get_cachedir():
+    cachedir = config and config.get('cachedir')
+    if cachedir and os.path.exists(cachedir):
+        return Path(cachedir)
+    else:
+        return Path(tempfile.mkdtemp())
+
+
 def regsub_file(pattern, repl, path):
     with open(path, 'rb') as f:
         text = f.read()
@@ -608,6 +665,34 @@ def parse_mirrors_config(mirrors):
         return mirrors
     else:
         raise TypeError(_('only accepts strings, lists, and tuples'))
+
+
+def get_mirrors(url, filename=None):
+    """Get list of dict entries for mirrors, appending filename if provided."""
+    # TODO use cached index if it exists
+    if isinstance(url, str):
+        url = urlsplit(url)
+
+    if url.netloc == 'f-droid.org':
+        mirrors = FDROIDORG_MIRRORS
+    else:
+        mirrors = parse_mirrors_config(url.geturl())
+
+    if filename:
+        return append_filename_to_mirrors(filename, mirrors)
+    else:
+        return mirrors
+
+
+def append_filename_to_mirrors(filename, mirrors):
+    """Append the filename to all "url" entries in the mirrors dict."""
+    appended = copy.deepcopy(mirrors)
+    for mirror in appended:
+        parsed = urlparse(mirror['url'])
+        mirror['url'] = urlunparse(
+            parsed._replace(path=os.path.join(parsed.path, filename))
+        )
+    return appended
 
 
 def file_entry(filename, hash_value=None):
@@ -1045,8 +1130,8 @@ def get_toolsversion_logname(app, build):
     return "%s_%s_toolsversion.log" % (app.id, build.versionCode)
 
 
-def getsrcname(app, build):
-    return "%s_%s_src.tar.gz" % (app.id, build.versionCode)
+def get_src_tarball_name(appid, versionCode):
+    return f"{appid}_{versionCode}_src.tar.gz"
 
 
 def get_build_dir(app):
@@ -1660,11 +1745,11 @@ class vcs_hg(vcs):
                 self.clone_failed = True
                 raise VCSException("Hg clone failed", p.output)
         else:
-            p = FDroidPopen(['hg', 'status', '-uS'], cwd=self.local, output=False)
+            p = FDroidPopen(['hg', 'status', '-uiS'], cwd=self.local, output=False)
             if p.returncode != 0:
                 raise VCSException("Hg status failed", p.output)
             for line in p.output.splitlines():
-                if not line.startswith('? '):
+                if not line.startswith('? ') and not line.startswith('I '):
                     raise VCSException("Unexpected output from hg status -uS: " + line)
                 FDroidPopen(['rm', '-rf', '--', line[2:]], cwd=self.local, output=False)
             if not self.refreshed:
@@ -1679,16 +1764,6 @@ class vcs_hg(vcs):
         p = FDroidPopen(['hg', 'update', '-C', '--', rev], cwd=self.local, output=False)
         if p.returncode != 0:
             raise VCSException("Hg checkout of '%s' failed" % rev, p.output)
-        p = FDroidPopen(['hg', 'purge', '--all'], cwd=self.local, output=False)
-        # Also delete untracked files, we have to enable purge extension for that:
-        if "'purge' is provided by the following extension" in p.output:
-            with open(os.path.join(self.local, '.hg', 'hgrc'), "a") as myfile:
-                myfile.write("\n[extensions]\nhgext.purge=\n")
-            p = FDroidPopen(['hg', 'purge', '--all'], cwd=self.local, output=False)
-            if p.returncode != 0:
-                raise VCSException("HG purge failed", p.output)
-        elif p.returncode != 0:
-            raise VCSException("HG purge failed", p.output)
 
     def _gettags(self):
         p = FDroidPopen(['hg', 'tags', '-q'], cwd=self.local, output=False)
@@ -2555,42 +2630,19 @@ class KnownApks:
         this is parsed as a list from the end to allow the filename to
         have any combo of spaces.
         """
-        self.path = os.path.join('stats', 'known_apks.txt')
         self.apks = {}
-        if os.path.isfile(self.path):
-            with open(self.path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    t = line.rstrip().split(' ')
-                    if len(t) == 2:
-                        self.apks[t[0]] = (t[1], None)
-                    else:
-                        appid = t[-2]
-                        date = datetime.strptime(t[-1], '%Y-%m-%d')
-                        filename = line[0:line.rfind(appid) - 1]
-                        self.apks[filename] = (appid, date)
-                        check_system_clock(date, self.path)
-        self.changed = False
+        for part in ('repo', 'archive'):
+            path = os.path.join(part, 'index-v2.json')
+            if os.path.isfile(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    index = json.load(f)
+                    for appid, data in index["packages"].items():
+                        for version in data["versions"].values():
+                            filename = version["file"]["name"][1:]
+                            date = datetime.fromtimestamp(version["added"] // 1000, tz=timezone.utc)
+                            self.apks[filename] = date
 
-    def writeifchanged(self):
-        if not self.changed:
-            return
-
-        if not os.path.exists('stats'):
-            os.mkdir('stats')
-
-        lst = []
-        for apk, app in self.apks.items():
-            appid, added = app
-            line = apk + ' ' + appid
-            if added:
-                line += ' ' + added.strftime('%Y-%m-%d')
-            lst.append(line)
-
-        with open(self.path, 'w') as f:
-            for line in sorted(lst, key=natural_key):
-                f.write(line + '\n')
-
-    def recordapk(self, apkName, app, default_date=None):
+    def recordapk(self, apkName, default_date=None):
         """
         Record an APK (if it's new, otherwise does nothing).
 
@@ -2601,37 +2653,9 @@ class KnownApks:
         """
         if apkName not in self.apks:
             if default_date is None:
-                default_date = datetime.utcnow()
-            self.apks[apkName] = (app, default_date)
-            self.changed = True
-        _ignored, added = self.apks[apkName]
-        return added
-
-    def getapp(self, apkname):
-        """Look up information - given the 'apkname'.
-
-        Returns (app id, date added/None).
-        Or returns None for an unknown apk.
-        """
-        if apkname in self.apks:
-            return self.apks[apkname]
-        return None
-
-    def getlatest(self, num):
-        """Get the most recent 'num' apps added to the repo, as a list of package ids with the most recent first."""
-        apps = {}
-        for apk, app in self.apks.items():
-            appid, added = app
-            if added:
-                if appid in apps:
-                    if apps[appid] > added:
-                        apps[appid] = added
-                else:
-                    apps[appid] = added
-        sortedapps = sorted(apps.items(), key=operator.itemgetter(1))[-num:]
-        lst = [app for app, _ignored in sortedapps]
-        lst.reverse()
-        return lst
+                default_date = datetime.now(timezone.utc)
+            self.apks[apkName] = default_date
+        return self.apks[apkName]
 
 
 def get_file_extension(filename):
@@ -2952,7 +2976,7 @@ def FDroidPopenBytes(commands, cwd=None, envs=None, output=True, stderr_to_stdou
     while not stdout_reader.eof():
         while not stdout_queue.empty():
             line = stdout_queue.get()
-            if output and options.verbose:
+            if output and options and options.verbose:
                 # Output directly to console
                 sys.stderr.buffer.write(line)
                 sys.stderr.flush()
@@ -3625,7 +3649,9 @@ def sign_apk(unsigned_path, signed_path, keyalias):
     os.remove(unsigned_path)
 
 
-def verify_apks(signed_apk, unsigned_apk, tmp_dir, v1_only=None):
+def verify_apks(
+    signed_apk, unsigned_apk, tmp_dir, v1_only=None, clean_up_verified=False
+):
     """Verify that two apks are the same.
 
     One of the inputs is signed, the other is unsigned. The signature metadata
@@ -3645,6 +3671,8 @@ def verify_apks(signed_apk, unsigned_apk, tmp_dir, v1_only=None):
     v1_only
         True for v1-only signatures, False for v1 and v2 signatures,
         or None for autodetection
+    clean_up_verified
+        Remove any files created here if the verification succeeded.
 
     Returns
     -------
@@ -3681,6 +3709,9 @@ def verify_apks(signed_apk, unsigned_apk, tmp_dir, v1_only=None):
         if result is not None:
             error += '\nComparing reference APK to APK with copied signature...\n' + result
         return error
+    if clean_up_verified and os.path.exists(tmp_apk):
+        logging.info(f"...cleaned up {tmp_apk} after successful verification")
+        os.remove(tmp_apk)
 
     logging.info('...successfully verified')
     return None
@@ -4672,3 +4703,89 @@ def _install_ndk(ndk):
         logging.info(
             _('Set NDK {release} ({version}) up').format(release=ndk, version=version)
         )
+
+
+def calculate_archive_policy(app, default):
+    """Calculate the archive policy from the metadata and default config."""
+    if app.get('ArchivePolicy') is not None:
+        archive_policy = app['ArchivePolicy']
+    else:
+        archive_policy = default
+        if app.get('VercodeOperation'):
+            archive_policy *= len(app['VercodeOperation'])
+    builds = [build for build in app.Builds if not build.disable]
+    if app.Builds and archive_policy > len(builds):
+        archive_policy = len(builds)
+    return archive_policy
+
+
+FDROIDORG_MIRRORS = [
+    {
+        'isPrimary': True,
+        'url': 'https://f-droid.org/repo',
+        'dnsA': ['65.21.79.229', '136.243.44.143'],
+        'dnsAAAA': ['2a01:4f8:212:c98::2', '2a01:4f9:3b:546d::2'],
+        'worksWithoutSNI': True,
+    },
+    {
+        'url': 'http://fdroidorg6cooksyluodepej4erfctzk7rrjpjbbr6wx24jh3lqyfwyd.onion/fdroid/repo'
+    },
+    {
+        'url': 'http://dotsrccccbidkzg7oc7oj4ugxrlfbt64qebyunxbrgqhxiwj3nl6vcad.onion/fdroid/repo'
+    },
+    {
+        'url': 'http://ftpfaudev4triw2vxiwzf4334e3mynz7osqgtozhbc77fixncqzbyoyd.onion/fdroid/repo'
+    },
+    {
+        'url': 'http://lysator7eknrfl47rlyxvgeamrv7ucefgrrlhk7rouv3sna25asetwid.onion/pub/fdroid/repo'
+    },
+    {
+        'url': 'http://mirror.ossplanetnyou5xifr6liw5vhzwc2g2fmmlohza25wwgnnaw65ytfsad.onion/fdroid/repo'
+    },
+    {'url': 'https://fdroid.tetaneutral.net/fdroid/repo', 'countryCode': 'FR'},
+    {
+        'url': 'https://ftp.agdsn.de/fdroid/repo',
+        'countryCode': 'DE',
+        "dnsA": ["141.30.235.39"],
+        "dnsAAAA": ["2a13:dd85:b00:12::1"],
+        "worksWithoutSNI": True,
+    },
+    {
+        'url': 'https://ftp.fau.de/fdroid/repo',
+        'countryCode': 'DE',
+        "dnsA": ["131.188.12.211"],
+        "dnsAAAA": ["2001:638:a000:1021:21::1"],
+        "worksWithoutSNI": True,
+    },
+    {'url': 'https://ftp.gwdg.de/pub/android/fdroid/repo', 'countryCode': 'DE'},
+    {
+        'url': 'https://ftp.lysator.liu.se/pub/fdroid/repo',
+        'countryCode': 'SE',
+        "dnsA": ["130.236.254.251", "130.236.254.253"],
+        "dnsAAAA": ["2001:6b0:17:f0a0::fb", "2001:6b0:17:f0a0::fd"],
+        "worksWithoutSNI": True,
+    },
+    {'url': 'https://mirror.cyberbits.eu/fdroid/repo', 'countryCode': 'FR'},
+    {
+        'url': 'https://mirror.fcix.net/fdroid/repo',
+        'countryCode': 'US',
+        "dnsA": ["23.152.160.16"],
+        "dnsAAAA": ["2620:13b:0:1000::16"],
+        "worksWithoutSNI": True,
+    },
+    {'url': 'https://mirror.kumi.systems/fdroid/repo', 'countryCode': 'AT'},
+    {'url': 'https://mirror.level66.network/fdroid/repo', 'countryCode': 'DE'},
+    {'url': 'https://mirror.ossplanet.net/fdroid/repo', 'countryCode': 'TW'},
+    {'url': 'https://mirrors.dotsrc.org/fdroid/repo', 'countryCode': 'DK'},
+    {'url': 'https://opencolo.mm.fcix.net/fdroid/repo', 'countryCode': 'US'},
+    {
+        'url': 'https://plug-mirror.rcac.purdue.edu/fdroid/repo',
+        'countryCode': 'US',
+        "dnsA": ["128.211.151.252"],
+        "dnsAAAA": ["2001:18e8:804:35::1337"],
+        "worksWithoutSNI": True,
+    },
+]
+FDROIDORG_FINGERPRINT = (
+    '43238D512C1E5EB2D6569F4A3AFBF5523418B82E0A3ED1552770ABB9A9C9CCAB'
+)

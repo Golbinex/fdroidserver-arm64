@@ -28,6 +28,7 @@ import os
 import re
 import ruamel.yaml
 import shutil
+import sys
 import tempfile
 import urllib.parse
 import zipfile
@@ -77,7 +78,7 @@ def make(apps, apks, repodir, archive):
         sortedapps[appid] = apps[appid]
 
     repodict = collections.OrderedDict()
-    repodict['timestamp'] = datetime.utcnow().replace(tzinfo=timezone.utc)
+    repodict['timestamp'] = datetime.now(timezone.utc)
     repodict['version'] = METADATA_VERSION
 
     if common.config['repo_maxage'] != 0:
@@ -155,12 +156,11 @@ def make_website(apps, repodir, repodict):
     if not os.path.exists(repodir):
         os.makedirs(repodir)
 
-    qrcode.make(link_fingerprinted).save(os.path.join(repodir, "index.png"))
-
     html_name = 'index.html'
     html_file = os.path.join(repodir, html_name)
 
     if _should_file_be_generated(html_file, autogenerate_comment):
+        qrcode.make(link_fingerprinted).save(os.path.join(repodir, "index.png"))
         with open(html_file, 'w') as f:
             name = repodict["name"]
             description = repodict["description"]
@@ -1310,6 +1310,29 @@ def make_v0(apps, apks, repodir, repodict, requestsdict, fdroid_signing_key_fing
                         os.remove(siglinkname)
                     os.symlink(sigfile_path, siglinkname)
 
+    if sys.version_info.minor >= 13:
+        # Python 3.13 changed minidom so it no longer converts " to an XML entity.
+        # https://github.com/python/cpython/commit/154477be722ae5c4e18d22d0860e284006b09c4f
+        # This just puts back the previous implementation, with black code format.
+        import inspect
+        import xml.dom.minidom
+
+        def _write_data(writer, text, attr):  # pylint: disable=unused-argument
+            if text:
+                text = (
+                    text.replace('&', '&amp;')
+                    .replace('<', '&lt;')
+                    .replace('"', '&quot;')
+                    .replace('>', '&gt;')
+                )
+            writer.write(text)
+
+        argnames = tuple(inspect.signature(xml.dom.minidom._write_data).parameters)
+        if argnames == ('writer', 'text', 'attr'):
+            xml.dom.minidom._write_data = _write_data
+        else:
+            logging.warning('Failed to monkey patch minidom for index.xml support!')
+
     if common.options.pretty:
         output = doc.toprettyxml(encoding='utf-8')
     else:
@@ -1633,7 +1656,7 @@ def download_repo_index_v1(url_str, etag=None, verify_fingerprint=True, timeout=
         return index, new_etag
 
 
-def download_repo_index_v2(url_str, etag=None, verify_fingerprint=True, timeout=600):
+def download_repo_index_v2(url_str, etag=None, verify_fingerprint=True, timeout=None):
     """Download and verifies index v2 file, then returns its data.
 
     Downloads the repository index from the given :param url_str and
@@ -1652,7 +1675,12 @@ def download_repo_index_v2(url_str, etag=None, verify_fingerprint=True, timeout=
         - The new eTag as returned by the HTTP request
 
     """
+    etag  # etag is unused but needs to be there to keep the same API as the earlier functions.
+
     url = urllib.parse.urlsplit(url_str)
+
+    if timeout is not None:
+        logging.warning('"timeout" argument of download_repo_index_v2() is deprecated!')
 
     fingerprint = None
     if verify_fingerprint:
@@ -1665,29 +1693,22 @@ def download_repo_index_v2(url_str, etag=None, verify_fingerprint=True, timeout=
         path = url.path.rsplit('/', 1)[0]
     else:
         path = url.path.rstrip('/')
+    url = urllib.parse.SplitResult(url.scheme, url.netloc, path, '', '')
 
-    url = urllib.parse.SplitResult(url.scheme, url.netloc, path + '/entry.jar', '', '')
-    download, new_etag = net.http_get(url.geturl(), etag, timeout)
+    mirrors = common.get_mirrors(url, 'entry.jar')
+    f = net.download_using_mirrors(mirrors)
+    entry, public_key, fingerprint = get_index_from_jar(f, fingerprint)
 
-    if download is None:
-        return None, new_etag
-
-    # jarsigner is used to verify the JAR, it requires a file for input
-    with tempfile.TemporaryDirectory() as dirname:
-        with (Path(dirname) / 'entry.jar').open('wb') as fp:
-            fp.write(download)
-            fp.flush()
-            entry, public_key, fingerprint = get_index_from_jar(fp.name, fingerprint)
-
-    name = entry['index']['name']
     sha256 = entry['index']['sha256']
-    url = urllib.parse.SplitResult(url.scheme, url.netloc, path + name, '', '')
-    index, _ignored = net.http_get(url.geturl(), None, timeout)
+    mirrors = common.get_mirrors(url, entry['index']['name'][1:])
+    f = net.download_using_mirrors(mirrors)
+    with open(f, 'rb') as fp:
+        index = fp.read()
     if sha256 != hashlib.sha256(index).hexdigest():
         raise VerificationException(
             _("SHA-256 of {url} does not match entry!").format(url=url)
         )
-    return json.loads(index), new_etag
+    return json.loads(index), None
 
 
 def get_index_from_jar(jarfile, fingerprint=None, allow_deprecated=False):

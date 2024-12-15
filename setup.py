@@ -70,7 +70,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='fdroidserver',
-    version='2.3a2',
+    version='2.3.4',
     description='F-Droid Server Tools',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -93,6 +93,8 @@ setup(
         'platformdirs',
         'androguard >= 3.3.5',
         'asn1crypto',
+        # TODO use biplist on all platforms once IPA support is stable
+        'biplist ; sys_platform=="darwin"',
         'clint',
         'defusedxml',
         'GitPython',
@@ -100,6 +102,8 @@ setup(
         'paramiko',
         'Pillow',
         'apache-libcloud >= 0.14.1',
+        'puremagic',
+        'pycountry ; sys_platform=="darwin"',
         'python-vagrant',
         'PyYAML',
         'qrcode',
@@ -112,8 +116,13 @@ setup(
     # Some requires are only needed for very limited cases:
     # * biplist is only used for parsing Apple .ipa files
     # * pycountry is only for linting config/mirrors.yml
+    # * python-magic is preferred when libmagic is available, but its not in pypi.org
     extras_require={
-        'optional': ['biplist', 'pycountry'],
+        'optional': [
+            'biplist',
+            'pycountry',
+            'python-magic',
+        ],
         'test': ['pyjks', 'html5print'],
         'docs': [
             'sphinx',
@@ -123,7 +132,7 @@ setup(
         ],
     },
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: Information Technology',
         'Intended Audience :: System Administrators',
@@ -132,6 +141,13 @@ setup(
         'Operating System :: POSIX',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Unix',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.9',
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        'Programming Language :: Python :: 3 :: Only',
         'Topic :: Utilities',
     ],
 )
